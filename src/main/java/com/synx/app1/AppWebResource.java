@@ -18,6 +18,7 @@ package com.synx.app1;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import org.onlab.rest.BaseResource;
 import org.onosproject.rest.AbstractWebResource;
 
 import java.security.cert.CertPathBuilder;
