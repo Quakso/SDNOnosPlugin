@@ -16,11 +16,7 @@
 package com.synx.app1;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.onlab.packet.*;
 import org.onosproject.core.DefaultApplicationId;
@@ -40,7 +36,6 @@ import org.onosproject.net.link.LinkService;
 import org.onosproject.net.packet.*;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.*;
-import org.osgi.service.dmt.MetaNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +43,7 @@ import org.slf4j.LoggerFactory;
  * Skeletal ONOS application component.
  */
 @Component(immediate = true)
-public class AppComponent implements DeviceAndHostService, DelayService {
+public class AppComponent implements DeviceAndHostService, DelayService, LinkChangeService {
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected LinkService linkService;
@@ -84,20 +79,23 @@ public class AppComponent implements DeviceAndHostService, DelayService {
     private final DeviceListener deviceListener = new InternalDeviceListener();
     private final HostListener hostListener = new InternalHostListener();
 
+    private Integer changeId = 0;
+
+    private String changeMsg = "";
+
     @Activate
     protected void activate() {
         log.info("Started");
         packetService.addProcessor(processor, PacketProcessor.director(1));
         packetService.requestPackets(
-                //流表匹配对应vlanId
-                DefaultTrafficSelector.builder().matchVlanId(VlanId.vlanId(delayVlanId)).build(),
+                //流表匹配对应etherType
+                DefaultTrafficSelector.builder().matchEthType(delayEtherType).build(),
                 PacketPriority.MAX,
                 new DefaultApplicationId(0, "org.onosproject.core")
         );
         log.info("packetService:" + packetService.getRequests());
         initMap();
         linkService.addListener(linkListener);
-
         deviceService.addListener(deviceListener);
         hostService.addListener(hostListener);
     }
@@ -110,8 +108,8 @@ public class AppComponent implements DeviceAndHostService, DelayService {
         linkService.removeListener(linkListener);
         packetService.removeProcessor(processor);
         packetService.cancelPackets(
-                //流表匹配对应vlanId
-                DefaultTrafficSelector.builder().matchVlanId(VlanId.vlanId(delayVlanId)).build(),
+                //流表匹配对应etherType
+                DefaultTrafficSelector.builder().matchEthType(delayEtherType).build(),
                 PacketPriority.MAX,
                 new DefaultApplicationId(0, "org.onosproject.core")
         );
@@ -142,6 +140,12 @@ public class AppComponent implements DeviceAndHostService, DelayService {
         return map;
     }
 
+    @Override
+    public Integer checkLinkChanged() {
+        return changeId;
+    }
+
+
     private class InternalDeviceListener implements DeviceListener {
         @Override
         public void event(DeviceEvent event) {
@@ -165,59 +169,57 @@ public class AppComponent implements DeviceAndHostService, DelayService {
             InboundPacket pkt = context.inPacket();
             Ethernet ethPkt = pkt.parsed();
             try {
-                if (ethPkt.getVlanID() == delayVlanId) {
+                if (ethPkt.getEtherType() == delayEtherType) {
                     log.info("Get a delay PACKET_IN");
-                    //如果收到包的vlanId是时延探测包的vlanId才进行处理
-                    //按照设计的PDU进行解析
-//                    if (ethPkt.getEtherType() == delayEtherType) {
-//                        log.info("Get a delay PACKET_IN IPv4");
-//                        IPv4 iPv4 = (IPv4) ethPkt.getPayload();
-//                        if (iPv4.getProtocol() == IPv4.PROTOCOL_UDP) {
-//                            log.info("Get a delay PACKET_IN UDP");
-//                            UDP udp = (UDP) iPv4.getPayload();
-//                            IPacket packet =udp.getPayload();
-//                            log.info(packet.toString());
-                    DelayDetectPacket packet=(DelayDetectPacket) ethPkt.getPayload();
+                    ByteBuffer buffer = ByteBuffer.wrap(ethPkt.getPayload().serialize());
+                    long beginTime = buffer.getLong(0);
+//                    log.info("beginTime " + beginTime);
+                    long deviceId = buffer.getLong(Long.BYTES);
+//                    log.info("srcDeviceId " + deviceId);
+                    long srcPortNumRaw = buffer.getLong(Long.BYTES<<1);
+//                    log.info("portNum " + portNum);
+                    long dstPortNumRaw = buffer.getLong(Long.BYTES*3);
+
                     //算出时间差
-                    long deltaDelay = System.currentTimeMillis() - packet.getBeginTime();
+                    long deltaDelay = System.currentTimeMillis() - beginTime;
                     //目的
                     DeviceId dstDeviceId = pkt.receivedFrom().deviceId();
                     //TODO:修改portNum为收到的接口
-                    PortNumber dstPortNum = pkt.receivedFrom().port();
+                    PortNumber dstPortNum=PortNumber.portNumber(dstPortNumRaw);
                     //源
-                    DeviceId srcDeviceId = DeviceId.deviceId(packet.getSrcDeviceId());
-                    PortNumber srcPortNum = PortNumber.portNumber(packet.getSrcPortNum());
+                    DeviceId srcDeviceId = DeviceId.deviceId(DelayDetectPacket.getSrcDeviceId(deviceId));
+                    PortNumber srcPortNum = PortNumber.portNumber(srcPortNumRaw);
                     //构建ConnectPoint
                     ConnectPoint srcPoint = new ConnectPoint(srcDeviceId, srcPortNum);
                     ConnectPoint dstPoint = new ConnectPoint(dstDeviceId, dstPortNum);
                     //往时延map中put值
                     log.info("Put into MAP " + srcPoint + ":{" + dstPoint + ":" + deltaDelay + "}");
                     delayMap.get(srcPoint.toString()).put(dstPoint.toString(), Long.toString(deltaDelay));
+                    for(String key : delayMap.get(srcPoint.toString()).keySet()){
+                        delayMap.get(srcPoint.toString()).put(key,Long.toString(deltaDelay));
+                    }
                     //阻断该包继续传播
                     context.block();
                 }
-
-
             } catch (Exception e) {
                 log.error(e.toString());
             }
         }
     }
 
-    private void SendDelayPackets(DeviceId srcDevId, PortNumber outputPortNum) {
+    private void SendDelayPacket(String tgtDeviceId, Long srcPortNum,Long dstPortNum) {
         Ethernet toSend = new Ethernet();//创建以太网帧
-        DelayDetectPacket packet = new DelayDetectPacket(System.currentTimeMillis(), srcDevId.toString(), outputPortNum.toLong());
+        DelayDetectPacket packet = new DelayDetectPacket(System.currentTimeMillis(), tgtDeviceId, dstPortNum,srcPortNum);
         log.info("packet:" + packet);
-        toSend.setDestinationMACAddress("99:99:99:99:99:99");
-        toSend.setSourceMACAddress("66:66:66:66:66:66");
+        toSend.setDestinationMACAddress("ff:ff:ff:ff:ff:ff");
+        toSend.setSourceMACAddress("ff:ff:ff:ff:ff:ff");
         toSend.setEtherType(delayEtherType);
-        IPv4 iPv4 = new IPv4();
-        iPv4.setPayload(packet);
-        toSend.setPayload(iPv4);
+        toSend.setPayload(packet);
         log.info("eth pkt:" + toSend);
-        OutboundPacket pkt = new DefaultOutboundPacket(srcDevId,
-                DefaultTrafficTreatment.builder().setOutput(outputPortNum).build(),
+        OutboundPacket pkt = new DefaultOutboundPacket(DeviceId.deviceId(tgtDeviceId),
+                DefaultTrafficTreatment.builder().setOutput(PortNumber.portNumber(srcPortNum)).build(),
                 ByteBuffer.wrap(toSend.serialize()));
+        log.info(Arrays.toString(toSend.serialize()));
         log.info("send pkt:" + pkt);
         packetService.emit(pkt);
     }
@@ -228,6 +230,7 @@ public class AppComponent implements DeviceAndHostService, DelayService {
      */
     private void initMap() {
         delayMap.clear();
+        delayMap=new HashMap<>();
         Iterable<Link> links = linkService.getLinks();
         for (Link li : links) {
             if (!delayMap.containsKey(li.src().toString())) {
@@ -246,58 +249,66 @@ public class AppComponent implements DeviceAndHostService, DelayService {
     }
 
     private class DelayThread extends Thread {
-        public DelayThread() {
+        public DelayThread(){
         }
 
         @Override
         public void run() {
-//            while (detecting) {
-//                try {
-            Iterable<Link> links = linkService.getLinks();
-            links.forEach(link -> {
-                log.info("send PACKET_OUT to " + link.src().deviceId().toString() + "/" + link.src().port().toString());
-                SendDelayPackets(link.src().deviceId(), link.src().port());
-            });
-//                    //每隔10秒发送时延探测包
-//                    sleep(10000);
-//                } catch (InterruptedException e) {
-//                    throw new RuntimeException(e);
-//                }
-//            }
+            while (detecting) {
+                try {
+                    Iterable<Link> links = linkService.getLinks();
+                    links.forEach(link -> {
+                        log.info("send PACKET_OUT to " + link.src().deviceId().toString() + "/" + link.src().port().toString());
+                        SendDelayPacket(link.src().deviceId().toString(), link.src().port().toLong(),link.dst().port().toLong());
+                    });
+                    //每隔10秒发送时延探测包
+                    sleep(10000);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
         }
     }
 
     @Override
     public Map<String, Map<String, String>> getDelayService() {
-        if (detecting) {
-            //正在时延检测
-            detecting = false;
-            //停止时延检测
-            return delayMap;
-        } else {
-            //不在时延检测，返回null,并开始检测
-            initMap();
-            detecting = true;
-            DelayThread newDelayThread = new DelayThread();
-            newDelayThread.start();
-            return null;
-        }
+        return delayMap;
     }
 
     @Override
-    public int sendTestPacket(String tgtDeviceId, Long portNum) {
+    public void startDelayDetect(){
+        initMap();
+        detecting=true;
+        DelayThread newDelayThread = new DelayThread();
+        newDelayThread.start();
+    }
+
+    @Override
+    public void stopDelayDetect(){
+        detecting=false;
+    }
+
+    /**
+     * 发送测试的时延包
+     *
+     * @param tgtDeviceId
+     * @param srcPortNum
+     * @return
+     */
+    @Override
+    public int sendTestPacket(String tgtDeviceId, Long srcPortNum,Long dstPortNum) {
         Ethernet toSend = new Ethernet();//创建以太网帧
-        DelayDetectPacket packet = new DelayDetectPacket(System.currentTimeMillis(), tgtDeviceId, portNum);
+        DelayDetectPacket packet = new DelayDetectPacket(System.currentTimeMillis(), tgtDeviceId, dstPortNum,srcPortNum);
         log.info("packet:" + packet);
-        toSend.setDestinationMACAddress("99:99:99:99:99:99");
-        toSend.setSourceMACAddress("66:66:66:66:66:66");
-        toSend.setVlanID(delayVlanId);//设置特殊的VlanID加以区分
+        toSend.setDestinationMACAddress("ff:ff:ff:ff:ff:ff");
+        toSend.setSourceMACAddress("ff:ff:ff:ff:ff:ff");
         toSend.setEtherType(delayEtherType);
         toSend.setPayload(packet);
         log.info("eth pkt:" + toSend);
         OutboundPacket pkt = new DefaultOutboundPacket(DeviceId.deviceId(tgtDeviceId),
-                DefaultTrafficTreatment.builder().setOutput(PortNumber.portNumber(portNum)).build(),
+                DefaultTrafficTreatment.builder().setOutput(PortNumber.portNumber(srcPortNum)).build(),
                 ByteBuffer.wrap(toSend.serialize()));
+        log.info(Arrays.toString(toSend.serialize()));
         log.info("send pkt:" + pkt);
         packetService.emit(pkt);
         return 0;
@@ -310,11 +321,24 @@ public class AppComponent implements DeviceAndHostService, DelayService {
             if (type == LinkEvent.Type.LINK_ADDED || type == LinkEvent.Type.LINK_REMOVED || type == LinkEvent.Type.LINK_UPDATED) {
                 //检测到链路改变
                 //停止检测，并且进行delayMap结构的刷新
+                log.info("links changed");
+                changeId++;
+                switch (type) {
+                    case LINK_UPDATED:
+                        log.info("link update");
+                        break;
+                    case LINK_ADDED:
+                        log.info("link added");
+                        break;
+                    case LINK_REMOVED:
+                        log.info("link removed");
+                }
                 detecting = false;
+                //停止时延检测，并重新初始化map
                 initMap();
-                //表示可以进行时延检测了
-                detecting = true;
             }
         }
     }
+
+
 }

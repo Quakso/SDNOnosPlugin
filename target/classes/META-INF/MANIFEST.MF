@@ -1,5 +1,5 @@
 Manifest-Version: 1.0
-Bnd-LastModified: 1669650330930
+Bnd-LastModified: 1670640565558
 Build-Jdk: 11.0.17
 Built-By: quakso
 Bundle-ClassPath: WEB-INF/classes
@@ -31,7 +31,8 @@ Import-Package: com.fasterxml.jackson.databind;version="[2.10,3)",com.fa
  ,org.glassfish.jersey.servlet;version="[2.27,3)"
 Karaf-Commands: com.synx.app1
 Provide-Capability: osgi.service;objectClass:List<String>="com.synx.app1
- .DelayService,com.synx.app1.DeviceAndHostService"
+ .DelayService,com.synx.app1.DeviceAndHostService,com.synx.app1.LinkChan
+ geService"
 Require-Capability: osgi.service;filter:="(objectClass=org.onosproject.n
  et.device.DeviceService)";effective:=active,osgi.service;filter:="(obje
  ctClass=org.onosproject.net.host.HostService)";effective:=active,osgi.s

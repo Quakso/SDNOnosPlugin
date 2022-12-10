@@ -22,6 +22,7 @@ import org.onlab.rest.BaseResource;
 import org.onosproject.rest.AbstractWebResource;
 
 import java.security.cert.CertPathBuilder;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -65,7 +66,7 @@ public class AppWebResource extends AbstractWebResource {
      * @return 200 OK
      */
     @GET
-    @Path("/delay")
+    @Path("/delay/get")
     public Response getDelay() {
         ObjectNode node = mapper().createObjectNode();
         Map<String, Map<String,String>> map=delayService.getDelayService();
@@ -82,6 +83,29 @@ public class AppWebResource extends AbstractWebResource {
     }
 
     /**
+     * start delay detect
+     *
+     * @return
+     */
+    @GET
+    @Path("/delay/start")
+    public Response startDelay(){
+        delayService.startDelayDetect();
+        return Response.ok().build();
+    }
+
+    /**
+     * end delay detect
+     * @return
+     */
+    @GET
+    @Path("/delay/stop")
+    public Response stopDelay(){
+        delayService.stopDelayDetect();
+        return Response.ok().build();
+    }
+
+    /**
      * Send a test packet with vlan id 4094
      *
      * @return 200 OK
@@ -89,10 +113,23 @@ public class AppWebResource extends AbstractWebResource {
     @GET
     @Path("/testDelay")
     public Response getTest(){
-        delayService.sendTestPacket("of:0000000000000001",1L);
+        delayService.sendTestPacket("of:0000000000000001",1L,3L);
         return Response.ok().build();
     }
 
 
+    private final LinkChangeService linkChangeService=get(LinkChangeService.class);
+    /**
+     * Check If Link State Changed
+     * @return
+     */
+    @GET
+    @Path("/checkLinkChange")
+    public Response checkLinkChange(){
+        ObjectNode node = mapper().createObjectNode();
+        Integer changedId= linkChangeService.checkLinkChanged();
+        node.put("changeId",changedId);
+        return BaseResource.ok(node).build();
+    }
 
 }
