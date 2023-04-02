@@ -14,10 +14,10 @@
   ~ See the License for the specific language governing permissions and
   ~ limitations under the License.
   -->
-<app name="org.synx.app1" origin="SynX Studio" version="1.0"
-        title="Device And Host" category="default" url="http://onosproject.org"
-        featuresRepo="mvn:com.synx/device-and-host/1.0/xml/features"
-        features="device-and-host" apps="">
+<app name="org.quakso.app" origin="Quakso" version="1.0"
+        title="SDN App" category="default" url="http://onosproject.org"
+        featuresRepo="mvn:com.quakso/sdn-app/1.0/xml/features"
+        features="sdn-app" apps="">
     <description>Get Device Host And Delay Information</description>
-    <artifact>mvn:com.synx/device-and-host/1.0</artifact>
+    <artifact>mvn:com.quakso/sdn-app/1.0</artifact>
 </app>

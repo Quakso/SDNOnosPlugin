@@ -22,8 +22,8 @@
         <version>2.5.1</version>
     </parent>
 
-    <groupId>com.synx</groupId>
-    <artifactId>device-and-host</artifactId>
+    <groupId>com.quakso</groupId>
+    <artifactId>sdn-app</artifactId>
     <version>1.0</version>
     <packaging>bundle</packaging>
 
@@ -31,17 +31,17 @@
     <url>http://onosproject.org</url>
 
     <properties>
-        <onos.app.name>org.synx.app1</onos.app.name>
+        <onos.app.name>org.quakso.app</onos.app.name>
         <api.version>1.0.0</api.version>
         <api.description>Sample application REST API</api.description>
-        <onos.app.title>Device And Host</onos.app.title>
-        <onos.app.origin>SynX Studio</onos.app.origin>
+        <onos.app.title>SDN App</onos.app.title>
+        <onos.app.origin>Quakso</onos.app.origin>
         <onos.app.category>default</onos.app.category>
-        <api.package>com.synx.app1</api.package>
+        <api.package>com.quakso.app</api.package>
         <onos.app.url>http://onosproject.org</onos.app.url>
-        <api.title>Sample app REST API</api.title>
+        <api.title>SDN App REST API</api.title>
         <onos.app.readme>Get Device Host And Delay Information</onos.app.readme>
-        <web.context>/onos/device-and-host</web.context>
+        <web.context>/onos/sdn-app</web.context>
     </properties>
 
     <dependencies>
@@ -146,7 +146,7 @@
         <artifactId>maven-bundle-plugin</artifactId>
         <configuration>
           <instructions>
-            <Karaf-Commands>com.synx.app1</Karaf-Commands>
+            <Karaf-Commands>com.quakso.app</Karaf-Commands>
             <_wab>src/main/webapp/</_wab>
             <Include-Resource>WEB-INF/classes/apidoc/swagger.json=target/swagger.json,
                             {maven-resources}</Include-Resource>

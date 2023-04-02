@@ -13,19 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.quakso.app;
 
-package com.synx.app1;
-
-import org.onlab.rest.AbstractWebApplication;
-
-import java.util.Set;
+import org.apache.karaf.shell.api.action.Command;
+import org.apache.karaf.shell.api.action.lifecycle.Service;
+import org.onosproject.cli.AbstractShellCommand;
 
 /**
- * Sample REST API web application.
+ * Sample Apache Karaf CLI command.
  */
-public class AppWebApplication extends AbstractWebApplication {
+@Service
+@Command(scope = "onos", name = "getmyinfo",
+         description = "Get Device And Host Information")
+public class AppCommand extends AbstractShellCommand {
+
+//    private final DeviceAndHostService deviceAndHostService= AbstractShellCommand.get(DeviceAndHostService.class);
+//
     @Override
-    public Set<Class<?>> getClasses() {
-        return getClasses(AppWebResource.class);
+    protected void doExecute() {
+//        print(deviceAndHostService.getDeviceAndHost().toString());
     }
+
 }

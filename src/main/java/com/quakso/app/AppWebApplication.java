@@ -13,8 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.synx.app1;
 
-public interface SomeInterface {
+package com.quakso.app;
 
+import org.onlab.rest.AbstractWebApplication;
+
+import java.util.Set;
+
+/**
+ * Sample REST API web application.
+ */
+public class AppWebApplication extends AbstractWebApplication {
+    @Override
+    public Set<Class<?>> getClasses() {
+        return getClasses(AppWebResource.class);
+    }
 }

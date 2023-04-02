@@ -17,4 +17,4 @@
 /**
  * ONOS application archetype.
  */
-package com.synx.app1;
+package com.quakso.app;

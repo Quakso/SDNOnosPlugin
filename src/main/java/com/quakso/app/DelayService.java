@@ -1,8 +1,8 @@
-package com.synx.app1;
+package com.quakso.app;
 
 import java.util.Map;
 
-public interface DelayService {
+interface DelayService {
     /**
      * 获取时延检测包
      * @return
@@ -12,12 +12,12 @@ public interface DelayService {
     /**
      * 开始时延检测
      */
-    void startDelayDetect();
+    Map<String,String> startDelayDetect();
 
     /**
      * 停止时延检测
      */
-    void stopDelayDetect();
+    Map<String,String> stopDelayDetect();
 
     int sendTestPacket(String tgtDeviceId,Long dstPortNum,Long srcPortNum);
 }

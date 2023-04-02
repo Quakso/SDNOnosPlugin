@@ -13,50 +13,45 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.synx.app1;
+package com.quakso.app;
 
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import org.onlab.rest.BaseResource;
 import org.onosproject.rest.AbstractWebResource;
 
-import java.security.cert.CertPathBuilder;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Response;
 
 /**
  * Sample web resource.
  */
-@Path("sample")
+@Path("quakso")
 public class AppWebResource extends AbstractWebResource {
-    private final DeviceAndHostService deviceAndHostService=get(DeviceAndHostService.class);
-
-    /**
-     * Get Device andHost
-     *
-     * @return 200 OK
-     */
-    @GET
-    @Path("")
-    public Response getGreeting() {
-        ObjectNode node = mapper().createObjectNode();
-        ArrayNode anode=mapper().createArrayNode();
-        Map<String,List<String>> map=deviceAndHostService.getDeviceAndHost();
-        for(Map.Entry<String,List<String>> entry: map.entrySet()){
-            ArrayNode device = node.putArray(entry.getKey());
-            for(String host : entry.getValue()){
-                device.add(host);
-            }
-        }
-        return BaseResource.ok(node).build();
-    }
+//    private final DeviceAndHostService deviceAndHostService=get(DeviceAndHostService.class);
+//
+//    /**
+//     * Get Device andHost
+//     *
+//     * @return 200 OK
+//     */
+//    @GET
+//    @Path("/deviceAndHost")
+//    public Response getGreeting() {
+//        ObjectNode node = mapper().createObjectNode();
+//        ArrayNode anode=mapper().createArrayNode();
+//        Map<String,List<String>> map=deviceAndHostService.getDeviceAndHost();
+//        for(Map.Entry<String,List<String>> entry: map.entrySet()){
+//            ArrayNode device = node.putArray(entry.getKey());
+//            for(String host : entry.getValue()){
+//                device.add(host);
+//            }
+//        }
+//        return BaseResource.ok(node).build();
+//    }
 
     private final DelayService delayService=get(DelayService.class);
 
@@ -66,7 +61,7 @@ public class AppWebResource extends AbstractWebResource {
      * @return 200 OK
      */
     @GET
-    @Path("/delay/get")
+    @Path("/delay/getMap")
     public Response getDelay() {
         ObjectNode node = mapper().createObjectNode();
         Map<String, Map<String,String>> map=delayService.getDelayService();
@@ -90,8 +85,12 @@ public class AppWebResource extends AbstractWebResource {
     @GET
     @Path("/delay/start")
     public Response startDelay(){
-        delayService.startDelayDetect();
-        return Response.ok().build();
+        ObjectNode node = mapper().createObjectNode();
+        Map<String,String> map=delayService.startDelayDetect();
+        for(Map.Entry<String,String> entry: map.entrySet()){
+            node.put(entry.getKey(),map.get(entry.getKey()));
+        }
+        return BaseResource.ok(node).build();
     }
 
     /**
@@ -101,17 +100,20 @@ public class AppWebResource extends AbstractWebResource {
     @GET
     @Path("/delay/stop")
     public Response stopDelay(){
-        delayService.stopDelayDetect();
-        return Response.ok().build();
+        ObjectNode node = mapper().createObjectNode();
+        Map<String,String> map=delayService.stopDelayDetect();
+        for(Map.Entry<String,String> entry: map.entrySet()){
+            node.put(entry.getKey(),map.get(entry.getKey()));
+        }
+        return BaseResource.ok(node).build();
     }
 
     /**
-     * Send a test packet with vlan id 4094
-     *
+     * Send a test delay detect packet
      * @return 200 OK
      */
     @GET
-    @Path("/testDelay")
+    @Path("/delay/test")
     public Response getTest(){
         delayService.sendTestPacket("of:0000000000000001",1L,3L);
         return Response.ok().build();
@@ -127,9 +129,27 @@ public class AppWebResource extends AbstractWebResource {
     @Path("/checkLinkChange")
     public Response checkLinkChange(){
         ObjectNode node = mapper().createObjectNode();
-        Integer changedId= linkChangeService.checkLinkChanged();
-        node.put("changeId",changedId);
+        Map<String,String > map= linkChangeService.checkLinkChanged();
+        for(Map.Entry<String,String> entry: map.entrySet()){
+            node.put(entry.getKey(),map.get(entry.getKey()));
+        }
         return BaseResource.ok(node).build();
     }
 
+    private final UdpListenService udpListenService=get(UdpListenService.class);
+
+    /**
+     * Get udp
+     * @return
+     */
+    @GET
+    @Path("/udpMsg")
+    public Response getUdpListenMsg(){
+        ObjectNode node = mapper().createObjectNode();
+        Map<String,String> map=udpListenService.getUdpListenMsg();
+        for(Map.Entry<String,String> entry: map.entrySet()){
+            node.put(entry.getKey(),map.get(entry.getKey()));
+        }
+        return BaseResource.ok(node).build();
+    }
 }

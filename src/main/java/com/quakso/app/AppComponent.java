@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.synx.app1;
+package com.quakso.app;
 
 import java.nio.ByteBuffer;
 import java.util.*;
@@ -21,15 +21,8 @@ import java.util.*;
 import org.onlab.packet.*;
 import org.onosproject.core.DefaultApplicationId;
 import org.onosproject.net.*;
-import org.onosproject.net.device.DeviceEvent;
-import org.onosproject.net.device.DeviceListener;
-import org.onosproject.net.device.DeviceService;
-import org.onosproject.net.device.DeviceEvent.Type;
 import org.onosproject.net.flow.DefaultTrafficSelector;
 import org.onosproject.net.flow.DefaultTrafficTreatment;
-import org.onosproject.net.host.HostEvent;
-import org.onosproject.net.host.HostListener;
-import org.onosproject.net.host.HostService;
 import org.onosproject.net.link.LinkEvent;
 import org.onosproject.net.link.LinkListener;
 import org.onosproject.net.link.LinkService;
@@ -43,7 +36,7 @@ import org.slf4j.LoggerFactory;
  * Skeletal ONOS application component.
  */
 @Component(immediate = true)
-public class AppComponent implements DeviceAndHostService, DelayService, LinkChangeService {
+public class AppComponent implements  DelayService, LinkChangeService,UdpListenService {
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected LinkService linkService;
@@ -56,12 +49,11 @@ public class AppComponent implements DeviceAndHostService, DelayService, LinkCha
 
     private final Short delayEtherType = (short) 0x0802;
 
-    private final Short delayVlanId = 4094;
 
     /**
-     * 决定时延检测线程是否结束
+     * 决定时延检测线程是否结束的标志
      */
-    private boolean detecting = true;
+    private boolean detecting = false;
 
     private Map<String, Map<String, String>> delayMap = new HashMap<>();
 
@@ -70,18 +62,27 @@ public class AppComponent implements DeviceAndHostService, DelayService, LinkCha
      */
     private final InternalLinkListener linkListener = new InternalLinkListener();
 
-    @Reference(cardinality = ReferenceCardinality.MANDATORY)
-    protected DeviceService deviceService;
+//    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+//    protected DeviceService deviceService;
+//
+//    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+//    protected HostService hostService;
 
-    @Reference(cardinality = ReferenceCardinality.MANDATORY)
-    protected HostService hostService;
-
-    private final DeviceListener deviceListener = new InternalDeviceListener();
-    private final HostListener hostListener = new InternalHostListener();
+//    private final DeviceListener deviceListener = new InternalDeviceListener();
+//    private final HostListener hostListener = new InternalHostListener();
+    private DelayThread curDelayThread;
 
     private Integer changeId = 0;
-
     private String changeMsg = "";
+    private String linkChangeSrc="";
+    private String linkChangeDst="";
+    private String linkEvent="";
+
+    private Integer udpServiceId=0;
+    private String udpSrcIp="";
+    private String udpDstIp="";
+    private String udpSrcMac="";
+    private String udpDstMac="";
 
     @Activate
     protected void activate() {
@@ -93,17 +94,16 @@ public class AppComponent implements DeviceAndHostService, DelayService, LinkCha
                 PacketPriority.MAX,
                 new DefaultApplicationId(0, "org.onosproject.core")
         );
-        log.info("packetService:" + packetService.getRequests());
         initMap();
         linkService.addListener(linkListener);
-        deviceService.addListener(deviceListener);
-        hostService.addListener(hostListener);
+//        deviceService.addListener(deviceListener);
+//        hostService.addListener(hostListener);
     }
 
     @Deactivate
     protected void deactivate() {
-        deviceService.removeListener(deviceListener);
-        hostService.removeListener(hostListener);
+//        deviceService.removeListener(deviceListener);
+//        hostService.removeListener(hostListener);
 
         linkService.removeListener(linkListener);
         packetService.removeProcessor(processor);
@@ -123,45 +123,62 @@ public class AppComponent implements DeviceAndHostService, DelayService, LinkCha
         log.info("Reconfigured");
     }
 
+//    @Override
+//    public Map<String, List<String>> getDeviceAndHost() {
+//        Map<String, List<String>> map = new HashMap<>();
+//        Iterable<Device> devices = deviceService.getDevices();
+//        for (Device device : devices) {
+//            log.info(device.id().toString());
+//            Set<Host> hosts = hostService.getConnectedHosts(device.id());
+//            List<String> hostsList = new ArrayList<>();
+//            for (Host host : hosts) {
+//                log.info(host.mac().toString() + host.ipAddresses());
+//                hostsList.add(host.mac().toString() + host.ipAddresses());
+//            }
+//            map.put(device.id().toString(), hostsList);
+//        }
+//        return map;
+//    }
+
     @Override
-    public Map<String, List<String>> getDeviceAndHost() {
-        Map<String, List<String>> map = new HashMap<>();
-        Iterable<Device> devices = deviceService.getDevices();
-        for (Device device : devices) {
-            log.info(device.id().toString());
-            Set<Host> hosts = hostService.getConnectedHosts(device.id());
-            List<String> hostsList = new ArrayList<>();
-            for (Host host : hosts) {
-                log.info(host.mac().toString() + host.ipAddresses());
-                hostsList.add(host.mac().toString() + host.ipAddresses());
-            }
-            map.put(device.id().toString(), hostsList);
-        }
+    public Map<String,String> checkLinkChanged() {
+        Map<String,String> map = new HashMap<>();
+        map.put("changeId", String.valueOf(changeId));
+        map.put("changeMsg",changeMsg);
+        map.put("linkEvent",linkEvent);
+        map.put("linkChangeSrc",linkChangeSrc);
+        map.put("linkChangeDst",linkChangeDst);
         return map;
     }
 
     @Override
-    public Integer checkLinkChanged() {
-        return changeId;
+    public Map<String, String> getUdpListenMsg() {
+        Map<String,String> map = new HashMap<>();
+        map.put("udpServiceId", String.valueOf(udpServiceId));
+        map.put("udpSrcMac",udpSrcMac);
+        map.put("udpDstMac",udpDstMac);
+        map.put("udpSrcIp",udpSrcIp);
+        map.put("udpDstIp",udpDstIp);
+        return map;
     }
 
 
-    private class InternalDeviceListener implements DeviceListener {
-        @Override
-        public void event(DeviceEvent event) {
-            DeviceEvent.Type type = event.type();
-            if (type == DeviceEvent.Type.DEVICE_ADDED || type == Type.DEVICE_REMOVED) {
-                getDeviceAndHost();
-            }
-        }
-    }
+//    private class InternalDeviceListener implements DeviceListener {
+//        @Override
+//        public void event(DeviceEvent event) {
+//            DeviceEvent.Type type = event.type();
+//            if (type == DeviceEvent.Type.DEVICE_ADDED || type == Type.DEVICE_REMOVED) {
+//                getDeviceAndHost();
+//            }
+//        }
+//    }
 
-    private class InternalHostListener implements HostListener {
-        @Override
-        public void event(HostEvent event) {
-            getDeviceAndHost();
-        }
-    }
+//    private class InternalHostListener implements HostListener {
+//        @Override
+//        public void event(HostEvent event) {
+//            getDeviceAndHost();
+//        }
+//    }
 
     private class DelayPacketProcessor implements PacketProcessor {
         @Override
@@ -195,11 +212,21 @@ public class AppComponent implements DeviceAndHostService, DelayService, LinkCha
                     //往时延map中put值
                     log.info("Put into MAP " + srcPoint + ":{" + dstPoint + ":" + deltaDelay + "}");
                     delayMap.get(srcPoint.toString()).put(dstPoint.toString(), Long.toString(deltaDelay));
-                    for(String key : delayMap.get(srcPoint.toString()).keySet()){
-                        delayMap.get(srcPoint.toString()).put(key,Long.toString(deltaDelay));
-                    }
                     //阻断该包继续传播
                     context.block();
+                }else if(ethPkt.getEtherType()==Ethernet.TYPE_IPV4){
+                    IPv4 ipv4Packet= (IPv4) ethPkt.getPayload();
+                    if( ipv4Packet.getProtocol()==IPv4.PROTOCOL_UDP){
+                        //如果是检测到的特殊的UDP服务，说明可能发生了链路故障
+                        //记录下源和目的的ip与mac
+                        udpSrcMac=ethPkt.getSourceMAC().toString();
+                        udpDstMac=ethPkt.getDestinationMAC().toString();
+                        udpSrcIp=IPv4.fromIPv4Address(ipv4Packet.getSourceAddress());
+                        udpDstIp=IPv4.fromIPv4Address(ipv4Packet.getDestinationAddress());
+                        udpServiceId++;
+                        log.info("UdpServiceId:"+udpServiceId+"UdpSrcMac:"+udpSrcMac+" UdpDstMac:"+udpDstMac+" UdpSrcIp:"+udpSrcIp+" UdpDstIp:"+udpDstIp);
+                        context.send();//继续传播
+                    }
                 }
             } catch (Exception e) {
                 log.error(e.toString());
@@ -210,17 +237,13 @@ public class AppComponent implements DeviceAndHostService, DelayService, LinkCha
     private void SendDelayPacket(String tgtDeviceId, Long srcPortNum,Long dstPortNum) {
         Ethernet toSend = new Ethernet();//创建以太网帧
         DelayDetectPacket packet = new DelayDetectPacket(System.currentTimeMillis(), tgtDeviceId, dstPortNum,srcPortNum);
-        log.info("packet:" + packet);
         toSend.setDestinationMACAddress("ff:ff:ff:ff:ff:ff");
         toSend.setSourceMACAddress("ff:ff:ff:ff:ff:ff");
         toSend.setEtherType(delayEtherType);
         toSend.setPayload(packet);
-        log.info("eth pkt:" + toSend);
         OutboundPacket pkt = new DefaultOutboundPacket(DeviceId.deviceId(tgtDeviceId),
                 DefaultTrafficTreatment.builder().setOutput(PortNumber.portNumber(srcPortNum)).build(),
                 ByteBuffer.wrap(toSend.serialize()));
-        log.info(Arrays.toString(toSend.serialize()));
-        log.info("send pkt:" + pkt);
         packetService.emit(pkt);
     }
 
@@ -254,7 +277,12 @@ public class AppComponent implements DeviceAndHostService, DelayService, LinkCha
 
         @Override
         public void run() {
+            log.info("Begin of a delay detecting thread "+this.getId());
             while (detecting) {
+                if(this.isInterrupted()){
+                    log.info("Interrupt of a delay detecting thead "+this.getId());
+                    break;
+                }
                 try {
                     Iterable<Link> links = linkService.getLinks();
                     links.forEach(link -> {
@@ -264,9 +292,11 @@ public class AppComponent implements DeviceAndHostService, DelayService, LinkCha
                     //每隔10秒发送时延探测包
                     sleep(10000);
                 } catch (InterruptedException e) {
+                    log.info("Interrupt of a delay detecting thead "+this.getId()+" during sleep");
                     throw new RuntimeException(e);
                 }
             }
+            log.info("End of a delay detecting thread "+ this.getId());
         }
     }
 
@@ -276,16 +306,35 @@ public class AppComponent implements DeviceAndHostService, DelayService, LinkCha
     }
 
     @Override
-    public void startDelayDetect(){
-        initMap();
-        detecting=true;
-        DelayThread newDelayThread = new DelayThread();
-        newDelayThread.start();
+    public Map<String,String> startDelayDetect(){
+        String msg="";
+        Map<String,String> map=new HashMap<>();
+        if(detecting){
+            log.info("Already a running delay detection thread "+curDelayThread.getId());
+            msg="Already a running delay detection thread "+curDelayThread.getId();
+        }else{
+            initMap();
+            detecting=true;
+            curDelayThread = new DelayThread();
+            curDelayThread.start();
+            log.info("Start Delay Detection");
+            msg="Start Delay Detection";
+        }
+        map.put("msg",msg);
+        return map;
     }
 
     @Override
-    public void stopDelayDetect(){
+    public Map<String,String> stopDelayDetect(){
+        String msg="";
+        Map<String,String> map=new HashMap<>();
         detecting=false;
+        //中断线程
+        curDelayThread.interrupt();
+        log.info("Delay Detection Stopped");
+        msg="Delay Detection Stopped";
+        map.put("msg",msg);
+        return map;
     }
 
     /**
@@ -321,24 +370,39 @@ public class AppComponent implements DeviceAndHostService, DelayService, LinkCha
             if (type == LinkEvent.Type.LINK_ADDED || type == LinkEvent.Type.LINK_REMOVED || type == LinkEvent.Type.LINK_UPDATED) {
                 //检测到链路改变
                 //停止检测，并且进行delayMap结构的刷新
-                log.info("links changed");
                 changeId++;
                 switch (type) {
                     case LINK_UPDATED:
-                        log.info("link update");
+                        log.info("link update "+event);
+                        changeMsg="link update";
+                        linkEvent=event.toString();
+                        linkChangeSrc=event.subject().src().toString();
+                        linkChangeDst=event.subject().dst().toString();
                         break;
                     case LINK_ADDED:
-                        log.info("link added");
+                        log.info("link added "+event);
+                        linkEvent=event.toString();
+                        changeMsg="link added";
+                        linkChangeSrc=event.subject().src().toString();
+                        linkChangeDst=event.subject().dst().toString();
                         break;
                     case LINK_REMOVED:
-                        log.info("link removed");
+                        log.info("link removed "+event);
+                        changeMsg="link removed";
+                        linkEvent=event.toString();
+                        linkChangeSrc=event.subject().src().toString();
+                        linkChangeDst=event.subject().dst().toString();
+                        break;
                 }
-                detecting = false;
-                //停止时延检测，并重新初始化map
-                initMap();
+                log.info("Stop Delay Detection");
+                if(detecting){
+                    //如果有监测链路时延的线程，那么终止然后重启
+                    detecting = false;
+                    curDelayThread.interrupt();
+
+                    startDelayDetect();
+                }
             }
         }
     }
-
-
 }

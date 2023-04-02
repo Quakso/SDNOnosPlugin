@@ -2,7 +2,7 @@
 <project version="4">
   <component name="CompilerConfiguration">
     <annotationProcessing>
-      <profile name="Annotation profile for device-and-host" enabled="true">
+      <profile name="Annotation profile for sdn-app" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
@@ -86,13 +86,15 @@
           <entry name="$MAVEN_REPOSITORY$/org/easymock/easymock/3.1/easymock-3.1.jar" />
           <entry name="$MAVEN_REPOSITORY$/pl/pragmatists/JUnitParams/1.0.5/JUnitParams-1.0.5.jar" />
         </processorPath>
-        <module name="device-and-host" />
+        <module name="onos-quakso" />
+        <module name="quakso-delay-and-udp" />
       </profile>
     </annotationProcessing>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
-      <module name="device-and-host" options="-XDcompilePolicy=simple -Xplugin:ErrorProne -Xlint:unchecked" />
+      <module name="onos-quakso" options="-XDcompilePolicy=simple -Xplugin:ErrorProne -Xlint:unchecked" />
+      <module name="quakso-delay-and-udp" options="-XDcompilePolicy=simple -Xplugin:ErrorProne -Xlint:unchecked" />
     </option>
   </component>
 </project>

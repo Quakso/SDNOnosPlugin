@@ -1,4 +1,4 @@
-package com.synx.app1;
+package com.quakso.app;
 
 import org.onlab.packet.BasePacket;
 import org.slf4j.Logger;
